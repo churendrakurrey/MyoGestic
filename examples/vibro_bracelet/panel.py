@@ -242,7 +242,10 @@ class BraceletPanel:
                 for m in range(NUM_MOTORS):
                     imgui.table_next_column()
                     imgui.set_next_item_width(-imgui.FLT_MIN)
-                    hit, levels[m] = imgui.slider_int(f"##m{m}", levels[m], 0, 100, "%d")
+                    hit, levels[m] = imgui.slider_int(
+                        f"##m{m}", levels[m], 0, 100, "%d", imgui.SliderFlags_.always_clamp
+                    )
+                    imgui.set_item_tooltip("Drag, or Ctrl+click to type 0-100")
                     changed |= hit
                 imgui.table_next_column()
                 imgui.set_next_item_width(-imgui.FLT_MIN)

@@ -3,7 +3,7 @@
 m1..m4 are motor strengths in percent (0-100), pattern is 0-3.
 
 BLE sends 5 raw bytes, serial sends one text line ("100 0 0 0 1\\n").
-Must match the firmware (vibro_core) and docs/protocol.md.
+Same format as the firmware (vibro_core), see docs/protocol.md.
 """
 
 from __future__ import annotations
@@ -14,13 +14,17 @@ from enum import IntEnum
 NUM_MOTORS = 4
 MAX_LEVEL = 100  # percent
 
-#: Bluetooth name and UUIDs. Must match ``firmware/include/config.h``.
+#: Bluetooth name and UUIDs, as in ``firmware/include/config.h``.
 
 BLE_DEVICE_NAME = "VibroBand"
 BLE_SERVICE_UUID = "9193650f-3e8a-4f96-a695-e8c911ddfccc"
 BLE_COMMAND_CHAR_UUID = "267d3e32-e95e-48bd-ad51-774128640965"
+#: Notified by the bracelet every 100 ms: [m1, m2, m3, m4, pattern, flags].
+BLE_STATUS_CHAR_UUID = "e16c8f7b-63d2-43d7-b3cc-4c23c90e1fd3"
+#: Link counts as lost after this long without a status notification.
+STATUS_TIMEOUT_S = 0.5
 
-#: Resend interval. Must be well below the firmware watchdog (500 ms).
+#: Resend interval, well below the firmware watchdog (500 ms).
 HEARTBEAT_S = 0.1
 
 

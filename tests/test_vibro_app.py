@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 import myogestic.core
+import myogestic.remote
 from myogestic.tools import emg_generator
 
 APP = Path(__file__).resolve().parent.parent / "examples" / "vibro_bracelet" / "app.py"
@@ -23,6 +24,7 @@ def ns(monkeypatch, tmp_path):
     monkeypatch.setenv("VIBRO_MOVEMENTS", str(table))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(myogestic.core.App, "run", lambda self, *a, **k: None)
+    monkeypatch.setattr(myogestic.remote.InterfaceSpec, "launcher", lambda self: [])
     monkeypatch.setattr(
         emg_generator, "control_outlet", lambda: SimpleNamespace(push_sample=lambda x: None)
     )
@@ -32,6 +34,9 @@ def ns(monkeypatch, tmp_path):
         yield namespace
     finally:
         namespace["sender"].stop()
+        for name in ("binder", "recording_aid", "vhi_control"):
+            if namespace.get(name) is not None:
+                namespace[name].stop()
         for stream in namespace["app"].ctx.streams.values():
             stream.stop()
 
@@ -104,3 +109,17 @@ def test_every_step_draws_a_frame(ns, step, monkeypatch, implot_frame):
     )
     monkeypatch.setattr(type(ns["header"]), "ui", lambda self, ctx, done: step)
     implot_frame(lambda: ns["vibro_ui"](ns["app"].ctx))
+
+
+def test_virtual_hand_link_builds_without_a_running_hand(ns):
+    pytest.importorskip("grpc")
+    assert ns["_init_hand"]()
+    assert ns["link"] is not None
+    assert ns["link"].bus is None  # not bound until a hand answers
+    ns["_select_gesture"]("Fist")  # no hand: bracelet only, no error
+
+
+def test_gesture_names_are_translated_for_the_virtual_hand(ns):
+    assert ns["vhi_gesture"]("Pinch") == "TwoFingerPinch"
+    assert ns["vhi_gesture"]("Fist") == "Fist"
+    assert ns["vhi_gesture"]("Pointing") == "Pointing"  # not listed: unchanged

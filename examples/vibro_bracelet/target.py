@@ -16,7 +16,6 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 from myogestic.controls import Capability, ControlSet
-
 from vibro_bracelet.movements import MovementMap
 from vibro_bracelet.protocol import OFF, Command
 
@@ -27,7 +26,7 @@ NAMESPACE = "bracelet"
 
 
 class Link(Protocol):
-    """Delivers commands to the bracelet. ``set_command`` must not block."""
+    """Delivers commands to the bracelet. ``set_command`` returns immediately."""
 
     def set_command(self, command: Command) -> None:
         """Set the command the bracelet plays."""
@@ -121,7 +120,7 @@ class BraceletTarget:
         log.info("bracelet bound to %r", self._alias)
 
     def send(self, values: Mapping[str, Any], changed: Mapping[str, str]) -> None:
-        """Forward a gesture change to the link. Never raises."""
+        """Forward a gesture change to the link. Errors are logged, not raised."""
         if self._alias is None or self._alias not in changed:
             return
         state = str(changed[self._alias])
@@ -129,7 +128,7 @@ class BraceletTarget:
             self._link.set_command(self._movements.command_for(state))
             self._state = state
             self._failed = False
-        except Exception as exc:  # noqa: BLE001 - must not raise on the predict thread
+        except Exception as exc:  # noqa: BLE001 - runs on the predict thread
             if not self._failed:  # log once per failure streak
                 log.error("bracelet link failed: %r", exc)
             self._failed = True

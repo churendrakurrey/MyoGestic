@@ -1,0 +1,13 @@
+# Classifier output -> Virtual Hand (control hand, over gRPC).
+
+[dofs]
+gesture = { target = "vhi.control.gesture", debounce_s = 0.1 }
+
+# Our gesture name -> VHI gesture name. Names not listed are sent unchanged;
+# names VHI does not know are sent as its rest pose.
+# VHI gestures: Rest, Thumb, Index, Middle, Ring, Pinky, Fist, TwoFingerPinch,
+# ThreeFingerPinch, Pointing, ThumbExtension, IndexExtension, MiddleExtension,
+# RingExtension, PinkyExtension, WristUpDown, WristLeftRight
+[names]
+Open = "Rest"
+Pinch = "TwoFingerPinch"

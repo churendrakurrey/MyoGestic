@@ -19,8 +19,10 @@ from typing import Protocol
 from vibro_bracelet.protocol import (
     BLE_COMMAND_CHAR_UUID,
     BLE_DEVICE_NAME,
+    BLE_STATUS_CHAR_UUID,
     HEARTBEAT_S,
     OFF,
+    STATUS_TIMEOUT_S,
     Command,
 )
 
@@ -46,7 +48,7 @@ class Transport(Protocol):
         ...
 
     async def close(self) -> None:
-        """Close the connection. Must not raise."""
+        """Close the connection; errors are logged, not raised."""
         ...
 
 
@@ -86,6 +88,9 @@ class SerialTransport:
 class BleTransport:
     """Bluetooth LE: 5 raw bytes written to the command characteristic.
 
+    The bracelet notifies its status every 100 ms; ``STATUS_TIMEOUT_S`` without one
+    counts as a lost link, which is much faster than the BLE supervision timeout.
+
     Parameters
     ----------
     address
@@ -107,6 +112,9 @@ class BleTransport:
         self._device_name = device_name
         self._scan_timeout = scan_timeout
         self._client = None
+        self._last_status = 0.0
+        self._lost = False
+        self.reported: bytes = b""
 
     async def connect(self) -> None:
         """Scan if needed, then connect."""
@@ -120,15 +128,27 @@ class BleTransport:
             if device is None:
                 raise ConnectionError(f"no BLE device named {self._device_name!r} found")
             target = device
-        client = BleakClient(target)
+        client = BleakClient(target, disconnected_callback=self._on_disconnect)
         await client.connect()
+        self._lost = False
+        self._last_status = time.monotonic()
+        await client.start_notify(BLE_STATUS_CHAR_UUID, self._on_status)
         self._client = client
+
+    def _on_status(self, _characteristic, data: bytearray) -> None:
+        self._last_status = time.monotonic()
+        self.reported = bytes(data)
+
+    def _on_disconnect(self, _client) -> None:
+        self._lost = True
 
     async def send(self, command: Command) -> None:
         """Write the 5-byte payload without response."""
         client = self._client
-        if client is None or not client.is_connected:
+        if client is None or self._lost or not client.is_connected:
             raise ConnectionError("BLE link lost")
+        if time.monotonic() - self._last_status > STATUS_TIMEOUT_S:
+            raise ConnectionError(f"no status from the bracelet for {STATUS_TIMEOUT_S} s")
         await client.write_gatt_char(BLE_COMMAND_CHAR_UUID, command.to_bytes(), response=False)
 
     async def close(self) -> None:

@@ -24,7 +24,7 @@ _HEADER = """\
 # Gesture -> bracelet command: [m1, m2, m3, m4, pattern]
 # m1..m4  : motor strength in percent, 0-100 (M1 palm, M2 back of hand, M3 thumb side, M4 pinky side)
 # pattern : 0 constant, 1 pulse, 2 sweep forward, 3 sweep reverse
-# Names must match the classifier's class names. The rest gesture must be all zeros.
+# Names are the classifier's class names. The rest gesture is all zeros.
 """
 
 
@@ -38,7 +38,7 @@ class MovementMap:
     commands
         Gesture name -> command, in display order.
     rest
-        The neutral gesture. Must be in ``commands`` and all zeros.
+        The neutral gesture; in ``commands``, all zeros.
     path
         Where `save` writes by default.
     """

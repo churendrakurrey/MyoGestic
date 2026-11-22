@@ -9,10 +9,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples"))
 
-from myogestic.controls import ControlBus, load_control_map, resolve
 from vibro_bracelet.movements import MovementMap
 from vibro_bracelet.protocol import OFF, Command, Pattern
 from vibro_bracelet.target import ADDRESS, BraceletTarget
+
+from myogestic.controls import ControlBus, load_control_map, resolve
 
 HZ = 10.0  # debounce_s=0.2 -> 2 ticks
 

@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples"))
 
 from vibro_bracelet.protocol import OFF, Command, Pattern
-from vibro_bracelet.sender import CONNECTED, ERROR, STOPPED, BraceletSender
+from vibro_bracelet.sender import CONNECTED, ERROR, STOPPED, BleTransport, BraceletSender
 
 FIST = Command((100, 100, 100, 100), Pattern.CONSTANT)
 PINCH = Command((100, 0, 100, 0), Pattern.PULSE)
@@ -147,3 +147,33 @@ def test_set_command_before_start_is_kept(sent):
         assert wait_until(lambda: PINCH in sent)
     finally:
         sender.stop()
+
+
+class FakeBleClient:
+    is_connected = True
+
+    def __init__(self):
+        self.writes = []
+
+    async def write_gatt_char(self, uuid, data, response):
+        self.writes.append(bytes(data))
+
+
+def test_ble_link_counts_as_lost_without_status_notifications():
+    import asyncio
+
+    transport = BleTransport()
+    transport._client = FakeBleClient()
+    transport._on_status(None, bytearray([100, 100, 100, 100, 0, 0]))
+    asyncio.run(transport.send(FIST))  # fresh status: write goes out
+    assert transport._client.writes == [FIST.to_bytes()]
+    assert transport.reported == bytes([100, 100, 100, 100, 0, 0])
+
+    transport._last_status -= 1.0  # bracelet silent for 1 s
+    with pytest.raises(ConnectionError, match="no status"):
+        asyncio.run(transport.send(FIST))
+
+    transport._on_status(None, bytearray(6))
+    transport._on_disconnect(None)
+    with pytest.raises(ConnectionError, match="link lost"):
+        asyncio.run(transport.send(FIST))
