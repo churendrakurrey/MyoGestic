@@ -25,7 +25,7 @@ import numpy as np
 from imgui_bundle import icons_fontawesome_6 as fa
 from imgui_bundle import imgui
 
-from myogestic import App, Context, Fr, Grid, Layout, Px, Stream, TrainingData
+from myogestic import App, Context, Fr, Grid, Px, Stream, TrainingData
 from myogestic._theme import mono_font
 from myogestic.controls import (
     ControlBus,
@@ -51,6 +51,7 @@ from myogestic.tools.emg_generator import control_outlet
 from myogestic.vhi import virtual_hand
 from myogestic.widgets import (
     AppHeader,
+    DevicePicker,
     FeatureSelector,
     LogPanel,
     ParticipantPanel,
@@ -79,7 +80,7 @@ from myogestic.widgets.common import (
 )
 from vibro_bracelet.movements import MovementMap
 from vibro_bracelet.panel import BraceletPanel
-from vibro_bracelet.resize import Gap, GridResizer
+from vibro_bracelet.resize import Gap, GridResizer, PaneColumn, region
 from vibro_bracelet.sender import BraceletSender
 from vibro_bracelet.target import BraceletTarget
 
@@ -348,48 +349,21 @@ gesture_editor = GestureEditor()
 
 # --- widgets and layout ---
 
-WIDE = Grid.areas(
+# Columns: left (signal, simulator, log), middle (step, sessions), right (bracelet).
+# Drag a gap to resize; a pane's corner button collapses it to its heading line.
+TOP = Grid.areas(
     """
-    header    header   header
-    signal    step     bracelet
-    signal    sessions bracelet
-    simulator sessions bracelet
-    log       sessions bracelet
-    status    status   status
+    header header header
+    left   middle bracelet
+    status status status
     """,
-    row_height=[Px(52), Fr(3), Fr(1), Px(76), Px(110), Px(26)],
+    row_height=[Px(52), Fr(1), Px(26)],
     col_width=[Fr(1), Px(420), Px(460)],
     bare=("header", "status"),
 )
-# Draggable gutters: column widths, step/sessions split, left column rows.
-resizer = GridResizer(
-    WIDE,
-    [
-        Gap("col", 0, (1, 4)),
-        Gap("col", 1, (1, 4)),
-        Gap("row", 1, (1, 1)),
-        Gap("row", 2, (0, 0)),
-        Gap("row", 3, (0, 0)),
-    ],
-)
-layout = Layout(
-    wide=WIDE,
-    narrow=Grid.areas(
-        """
-        header
-        signal
-        simulator
-        step
-        bracelet
-        sessions
-        log
-        status
-        """,
-        row_height=[Px(52), Fr(2), Px(76), Fr(3), Fr(3), Fr(1.5), Px(110), Px(26)],
-        bare=("header", "status"),
-    ),
-    breakpoint=Px(1300),
-)
+top_gaps = GridResizer(TOP, [Gap("col", 0, (1, 1)), Gap("col", 1, (1, 1))])
+LEFT = PaneColumn(["signal", "simulator", "log"], [Fr(1), Px(76), Px(110)])
+MIDDLE = PaneColumn(["step", "sessions"], [Fr(3), Fr(1)])
 steps = StepBar(["Connect", "Record", "Train", "Predict"], widget_id="vibro_steps")
 participant = ParticipantPanel()
 header = AppHeader("Vibrotactile bracelet", steps=steps, participant=participant)
@@ -448,7 +422,8 @@ processes = ProcessLauncher(PROCESSES)
 recording = RecordingControls(
     CLASSES, on_record=_on_record, on_stop=_on_stop, on_gesture=_on_gesture, show_header=False
 )
-sessions = SessionManager("sessions", class_names=CLASSES)
+# Recordings land in data/<participant>/ (App default).
+sessions = SessionManager("data", class_names=CLASSES)
 train_button = TrainButton(pipeline, size=(-1, 0))
 training_log = TrainingLog(pipeline, height=100)
 predict_button = PredictButton(pipeline, size=(-1, 0))
@@ -635,8 +610,19 @@ def _connect_stream() -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
+def _connect_simulated() -> None:
+    # Point the stream back at the generator, as DevicePicker does for its devices.
+    app.ctx.streams["emg"]._source = LSLSource("TestEMG1")
+    _connect_stream()
+
+
+# Real EMG hardware (OTB Muovi / Sessantaquattro / Quattrocento, LSL, synthetic),
+# as in examples/start_here/myocontrol.py.
+device = DevicePicker("emg", show_header=False)
+
+
 def connect_ui(ctx: Context) -> None:
-    """EMG generator and stream connection."""
+    """EMG source (simulated or device), Virtual Hand."""
     running = processes.running("EMG Generator")
     imgui.text_colored(muted(), "EMG Generator (simulated EMG)")
     with tinted_row(SUCCESS if running else DANGER if connection["error"] else IDLE):
@@ -655,21 +641,27 @@ def connect_ui(ctx: Context) -> None:
                 ctx.log(f"EMG generator launch failed: {exc}")
     imgui.end_disabled()
 
-    imgui.spacing()
-    imgui.text_colored(muted(), "EMG stream · TestEMG1")
     stream = ctx.streams["emg"]
     connected = stream.status == "connected" and stream.info is not None
     busy = connection["busy"]
+    imgui.begin_disabled(ctx.state != "idle" or busy or not running)
+    if primary_button("Connect simulated EMG", size=(-1, 0)):
+        _connect_simulated()
+    imgui.end_disabled()
+
+    imgui.spacing()
+    imgui.text_colored(muted(), "EMG stream")
     tone = SUCCESS if connected else WARNING if busy else DANGER if stream.last_error else IDLE
     with tinted_row(tone):
         imgui.align_text_to_frame_padding()
+        source = type(getattr(stream, "_source", None)).__name__
         imgui.text_unformatted(
-            "Connected" if connected else "Connecting…" if busy else "Not connected"
+            f"Connected · {source}" if connected else "Connecting…" if busy else "Not connected"
         )
-    imgui.begin_disabled(ctx.state != "idle" or busy)
-    if primary_button("Reconnect" if connected else "Connect", size=(-1, 0)):
-        _connect_stream()
-    imgui.end_disabled()
+
+    imgui.spacing()
+    imgui.text_colored(muted(), "EMG device (real hardware)")
+    device.ui(ctx)
     imgui.spacing()
     imgui.text_colored(muted(), "Virtual Hand (optional)")
     hand_ui()
@@ -680,7 +672,7 @@ def _step_done(ctx: Context) -> list[bool]:
     return [
         stream is not None and stream.status == "connected" and stream.info is not None,
         bool(ctx.participant)
-        and any(pathlib.Path("sessions", ctx.participant).glob(f"{ctx.participant}_*")),
+        and any(pathlib.Path("data", ctx.participant).glob(f"{ctx.participant}_*")),
         pipeline.model is not None,
         ctx.state == "predicting",
     ]
@@ -690,44 +682,50 @@ def _step_done(ctx: Context) -> list[bool]:
 def vibro_ui(ctx: Context) -> None:
     """Main window."""
     done = _step_done(ctx)
-    with layout["header"]:
+    with TOP.area("header"):
         active = header.ui(ctx, done)
     if active != 1:
         recording.ui(ctx, visible=False)
-    with layout["sessions"]:
-        pipeline.training_data = sessions.ui(participant=ctx.participant)
-    with layout["step"]:
-        panel_header(steps.steps[active])
-        if active == 0:
-            connect_ui(ctx)
-        elif active == 1:
-            recording.ui(ctx)
-            imgui.spacing()
-            gesture_editor.ui(ctx)
-        elif active == 2:
-            imgui.text_colored(muted(), "Features")
-            features.ui()
-            imgui.spacing()
-            train_button.ui()
-            save_model_button.ui()
-            imgui.same_line()
-            load_model_button.ui()
-            training_log.ui()
-        else:
-            prediction.ui()
-            predict_button.ui()
-    with layout["bracelet"]:
+
+    with region(TOP, "middle"):
+        with MIDDLE.pane("sessions"):
+            pipeline.training_data = sessions.ui(participant=ctx.participant)
+        with MIDDLE.pane("step"):
+            panel_header(steps.steps[active])
+            if active == 0:
+                connect_ui(ctx)
+            elif active == 1:
+                recording.ui(ctx)
+                imgui.spacing()
+                gesture_editor.ui(ctx)
+            elif active == 2:
+                imgui.text_colored(muted(), "Features")
+                features.ui()
+                imgui.spacing()
+                train_button.ui()
+                save_model_button.ui()
+                imgui.same_line()
+                load_model_button.ui()
+                training_log.ui()
+            else:
+                prediction.ui()
+                predict_button.ui()
+        MIDDLE.gaps_ui()
+
+    with region(TOP, "left"):
+        with LEFT.pane("signal"):
+            viewer.ui(ctx)
+        with LEFT.pane("simulator"):
+            simulator.ui(ctx)
+        with LEFT.pane("log"):
+            log.ui(ctx)
+        LEFT.gaps_ui()
+
+    with TOP.area("bracelet"):
         bracelet_panel.ui(ctx)
-    with layout["signal"]:
-        viewer.ui(ctx)
-    with layout["simulator"]:
-        simulator.ui(ctx)
-    with layout["log"]:
-        log.ui(ctx)
-    with layout["status"]:
+    with TOP.area("status"):
         status.ui(ctx)
-    if layout._pick() is WIDE:
-        resizer.ui()
+    top_gaps.ui()
 
 
 def main() -> None:
