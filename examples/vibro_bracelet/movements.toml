@@ -1,0 +1,12 @@
+# Gesture -> bracelet command: [m1, m2, m3, m4, pattern]
+# m1..m4  : motor strength in percent, 0-100 (M1 palm, M2 back of hand, M3 thumb side, M4 pinky side)
+# pattern : 0 constant, 1 pulse, 2 sweep forward, 3 sweep reverse
+# Names must match the classifier's class names. The rest gesture must be all zeros.
+
+rest = "Rest"
+
+[movements]
+Rest = [0, 0, 0, 0, 0]
+Fist = [100, 100, 100, 100, 0]
+Open = [60, 60, 60, 60, 2]
+Pinch = [100, 0, 100, 0, 1]

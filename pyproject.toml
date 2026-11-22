@@ -61,6 +61,8 @@ Changelog = "https://github.com/NsquaredLab/MyoGestic/blob/main/CHANGELOG.md"
 brainflow = ["brainflow>=5.12.0"]
 bdi = ["biosignal-device-interface>=0.1.0"]
 serial = ["pyserial>=3.5"]
+# Vibrotactile bracelet (examples/vibro_bracelet): BLE + USB serial link.
+vibro = ["bleak>=0.22", "pyserial>=3.5"]
 zarrs = ["zarrs>=0.2.0"]
 # gRPC control plane to a remote target (the Virtual Hand Interface is one). grpcio-tools is only
 # needed to regenerate stubs via tools/gen_proto.py; generated _pb2 files are
