@@ -1580,6 +1580,7 @@ serial = [
 vibro = [
     { name = "bleak" },
     { name = "pyserial" },
+    { name = "scikit-learn" },
 ]
 zarrs = [
     { name = "zarrs" },
@@ -1615,6 +1616,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.0" },
     { name = "scikit-learn", marker = "extra == 'dev'", specifier = ">=1.4" },
     { name = "scikit-learn", marker = "extra == 'examples'", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'vibro'", specifier = ">=1.4" },
     { name = "scipy", specifier = ">=1.11.0" },
     { name = "torch", marker = "extra == 'dev'", specifier = ">=2.0" },
     { name = "torch", marker = "extra == 'examples'", specifier = ">=2.0" },

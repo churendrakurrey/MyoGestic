@@ -209,6 +209,10 @@ class BraceletSender:
         """The command currently being sent."""
         return self._command
 
+    def set_transport(self, make_transport: Callable[[], Transport]) -> None:
+        """Use a different transport from the next connection attempt on."""
+        self._make_transport = make_transport
+
     def set_command(self, command: Command) -> None:
         """Replace the current command. Non-blocking, any thread."""
         self._command = command

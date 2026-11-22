@@ -112,6 +112,28 @@ class MovementMap:
                 raise ValueError(f"gesture {name!r} already exists")
             self._commands[name] = command
 
+    def rename(self, old: str, new: str) -> None:
+        """Rename a gesture, keeping its position (and so its class number)."""
+        new = new.strip()
+        _check_name(new)
+        with self._lock:
+            if old not in self._commands:
+                raise KeyError(f"unknown gesture {old!r}")
+            if any(n.lower() == new.lower() and n != old for n in self._commands):
+                raise ValueError(f"gesture {new!r} already exists")
+            self._commands = {new if n == old else n: c for n, c in self._commands.items()}
+            if self._rest == old:
+                self._rest = new
+
+    def remove(self, name: str) -> None:
+        """Delete a gesture. The rest gesture cannot be removed."""
+        with self._lock:
+            if name not in self._commands:
+                raise KeyError(f"unknown gesture {name!r}")
+            if name == self._rest:
+                raise ValueError(f"the rest gesture {name!r} cannot be removed")
+            del self._commands[name]
+
     def to_toml(self) -> str:
         """The table as TOML text, in the same layout as the shipped file."""
         with self._lock:

@@ -117,3 +117,35 @@ def test_save_round_trips(tmp_path):
     assert again.command_for("Fist").values == (70, 70, 70, 70, 3)
     assert again.command_for("Pinch").values == (100, 0, 100, 0, 1)
     assert not path.with_suffix(".toml.tmp").exists()
+
+
+def test_remove_deletes_a_gesture_but_never_rest(tmp_path):
+    table, _ = small_table(tmp_path)
+    table.remove("Fist")
+    assert table.names == ("Rest",)
+    with pytest.raises(ValueError, match="cannot be removed"):
+        table.remove("Rest")
+    with pytest.raises(KeyError):
+        table.remove("Fist")
+
+
+def test_rename_keeps_position_and_command(tmp_path):
+    table, path = small_table(tmp_path)
+    table.add("Pinch", Command((100, 0, 100, 0), Pattern.PULSE))
+    table.rename("Fist", "Grip")
+    assert table.names == ("Rest", "Grip", "Pinch")
+    assert table.command_for("Grip").values == (100, 100, 100, 100, 0)
+    table.rename("Rest", "Relax")
+    assert table.rest == "Relax"
+    table.save()
+    assert MovementMap.load(path).rest == "Relax"
+
+
+def test_rename_refuses_duplicates_and_bad_names(tmp_path):
+    table, _ = small_table(tmp_path)
+    with pytest.raises(ValueError, match="already exists"):
+        table.rename("Fist", "rest")
+    with pytest.raises(ValueError):
+        table.rename("Fist", "two words")
+    with pytest.raises(KeyError):
+        table.rename("Nope", "Other")

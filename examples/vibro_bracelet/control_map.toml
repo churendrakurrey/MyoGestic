@@ -1,0 +1,5 @@
+# Classifier output -> bracelet. States come from movements.toml.
+# debounce_s: a new gesture must hold this long before the bracelet switches.
+
+[dofs]
+gesture = { target = "bracelet.movement", debounce_s = 0.1 }
